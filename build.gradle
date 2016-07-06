@@ -1,0 +1,129 @@
+@Managed interface JuiceComponent extends GeneralComponentSpec { }
+@Managed interface FruitLanguage extends LanguageSourceSet {}
+
+// TODO: ask why EnvVar must extend from BinarySpec (if not, it fails, why?)
+@Managed
+interface EnvVar {
+    String getValue()
+    void setValue(String value)
+}
+
+@Managed
+interface JuiceBinarySpec extends BinarySpec {
+    File getOutputDir()
+    void setOutputDir(File outputDir)
+
+    List<String> getArgs()
+    void setArgs(List<String> Args)
+
+    ModelMap<EnvVar> getEnvVars()
+}
+
+class JuicerTask extends SourceTask {
+
+    // A list of command line arguments
+    @Input
+    List<String> getArgs() {
+        CollectionUtils.stringize(
+            this.args.collect { it ->
+                it instanceof Closure? (it as Closure).call() : it
+            }.flatten()
+        )
+    }
+    void args(Object... args) {
+        this.args.addAll(args as List)
+    }
+    private List<Object> args = []
+
+    // Environment variables for the task
+    @Input
+    Map getEnvVars() {
+        return this.envVars
+    }
+    void setEnvVars(Map m) {
+        this.envVars = m
+    }
+    void envVars(Map m) {
+        this.envVars+=m
+    }
+    private Map envVars = [:]
+
+    @OutputDirectory
+    File outputDir
+
+    @TaskAction
+    void makeJuice() {
+        println(description)
+    }
+
+    String getDescription() {
+        return "Run ${name} with ${args} going to ${outputDir}"
+    }
+}
+
+class JuicerRules extends RuleSource {
+    @ComponentType void registerComponent(TypeBuilder<JuiceComponent> builder) { }
+    @ComponentType void registerFruitLanguage(TypeBuilder<FruitLanguage> builder) { }
+    @ComponentType void registerJuiceBinarySpec(TypeBuilder<JuiceBinarySpec> builder) { }
+
+    @Defaults
+    void setDefaults(@Each JuiceBinarySpec binary, File buildDir) {
+        println("Setting defaults for: "+binary)
+        binary.outputDir = buildDir
+        binary.args = ['--max-pulp']
+        println(binary.envVars)
+        // TODO: ask how to define default env var values
+        // define some default env vars, but how????
+//        binary.envVars {
+//            def1(EnvVars) { value = 'defValue1' }
+//        }
+    }
+
+    @BinaryTasks
+    void generateTasks(ModelMap<Task> tasks, final JuiceBinarySpec binary, File buildDir) {
+        binary.inputs.withType(FruitLanguage) { fruitLanguage ->
+            def outputDir = new File(buildDir,fruitLanguage.name)
+            tasks.create("${binary.name}Juicer", JuicerTask) { task ->
+                task.outputDir = outputDir
+                task.source = fruitLanguage.source.srcDirs
+                task.args(binary.getArgs())
+// TODO: ask how to pass env vars from the binary to the task
+// TODO: ask if the binary spec is where the binary task argument values are captured in the model
+                println("EnvVars: "+binary.getEnvVars().keySet())
+            }
+        }
+    }
+}
+
+apply plugin: JuicerRules
+
+model {
+    components {
+        juiceComponent(JuiceComponent) {
+            binaries {
+                // Describe the distributions
+                apple(JuiceBinarySpec) {
+                    // Overwrite the default args value with assign statement
+                    args = ['empire', 'melba']
+                    args += ['mcintosh']
+                    envVars {
+                        var1(EnvVar) { value = 'value1'}
+                        var2(EnvVar) { value = 'value2'}
+                    }
+                }
+                orange(JuiceBinarySpec) {
+                    // Add to default args with +=
+                    args += ['page', 'navel']
+                }
+            }
+            sources {
+                // Describe the sources
+                apple(FruitLanguage) {
+                    source {
+                        srcDirs 'src/main/apple'
+                    }
+                }
+            }
+        }
+    }
+}
