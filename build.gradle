@@ -16,7 +16,7 @@ interface JuiceBinarySpec extends BinarySpec {
     List<String> getArgs()
     void setArgs(List<String> Args)
 
-    ModelMap<EnvVar> getEnvVars()
+    ModelMap<EnvVar> getEnvVars3()
 }
 
 class JuicerTask extends SourceTask {
@@ -57,7 +57,7 @@ class JuicerTask extends SourceTask {
     }
 
     String getDescription() {
-        return "Run ${name} with ${args} going to ${outputDir}"
+        return "Run ${name} with ${args} and ${this.getEnvVars()} going to ${outputDir}"
     }
 }
 
@@ -71,12 +71,10 @@ class JuicerRules extends RuleSource {
         println("Setting defaults for: "+binary)
         binary.outputDir = buildDir
         binary.args = ['--max-pulp']
-        println(binary.envVars)
-        // TODO: ask how to define default env var values
-        // define some default env vars, but how????
-//        binary.envVars {
-//            def1(EnvVars) { value = 'defValue1' }
-//        }
+        println(binary.envVars3)
+        binary.envVars3 {
+            def1(EnvVar) { value = 'defaultValue1' }
+        }
     }
 
     @BinaryTasks
@@ -87,9 +85,12 @@ class JuicerRules extends RuleSource {
                 task.outputDir = outputDir
                 task.source = fruitLanguage.source.srcDirs
                 task.args(binary.getArgs())
-// TODO: ask how to pass env vars from the binary to the task
-// TODO: ask if the binary spec is where the binary task argument values are captured in the model
-                println("EnvVars: "+binary.getEnvVars().keySet())
+                println("EnvVars: "+binary.getEnvVars3().keySet())
+                def envVars = binary.getEnvVars3()
+                for(def k in envVars.keySet()) {
+                    println("${k}:"+envVars.get(k).value)
+                    task.envVars[k] = envVars.get(k).value
+                }
             }
         }
     }
@@ -106,7 +107,17 @@ model {
                     // Overwrite the default args value with assign statement
                     args = ['empire', 'melba']
                     args += ['mcintosh']
-                    envVars {
+
+                    // Syntax 1
+                    // envVars1 += ["FOO":"fooValue"]
+
+                    // Syntax 2
+                    // envVars2 {
+                    //     "VARIABLE" = "VALUE"
+                    // }
+
+                    // Syntax 3 (works)
+                    envVars3 {
                         var1(EnvVar) { value = 'value1'}
                         var2(EnvVar) { value = 'value2'}
                     }
