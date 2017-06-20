@@ -42,7 +42,7 @@ in [Idiomatic Gradle Plugin Writing (slides
 but passing a `Map` via the new model DSL is not as easy.
 
 
-For now, the best I could do does not quite work, and it looks like this:
+The best I could looks like this:
 
 ```
 model {
@@ -63,6 +63,3 @@ model {
 }
 ```
 
-The reason it does not work is that the `ModelMap<EnvVar>` behind the scenes
-is a write-only model which cannot be read, hence I cannot pass values
-from the model to the custom task. Bizarre.
